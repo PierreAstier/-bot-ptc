@@ -7,7 +7,7 @@ import os
 
 import sys
 import parameters
-import bfstuff.filehandlers
+import bfptc.filehandlers as filehandlers
 
 if __name__ == "__main__" :
     pairs_filename = sys.argv[1]
@@ -20,7 +20,7 @@ if __name__ == "__main__" :
     amps = None
     for i,l in enumerate(f.readlines()) :
         for fits in l.split() :
-            im = bfstuff.filehandlers.SlacBot(fits, None)
+            im = filehandlers.SlacBot(fits, None)
             fits_names[im.time_stamp()] = fits
             if amps is None : amps = im.segment_ids()
     print("associated time stamps and fits file names")

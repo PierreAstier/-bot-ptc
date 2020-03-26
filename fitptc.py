@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import ptc_utils
 import os.path
-import ptcfit
+import bfptc.ptcfit as ptcfit
 import matplotlib.pyplot as pl
 import sys
 import os

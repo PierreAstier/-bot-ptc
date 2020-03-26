@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-import ptcfit
+import bfptc.ptcfit as ptcfit
 import os.path
 import matplotlib.pyplot as pl
 import sys
