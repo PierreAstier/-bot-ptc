@@ -1,0 +1,84 @@
+# -*- mode: makefile-gmake -*-. S
+FILE_HANDLER=-f S
+# bad file: filter it out  
+NO_BAD_FILES = | grep -v  434626.0
+CHIP_NAME=$$(basename  $$PWD)
+
+# link to the source directory, done in the Makefile)
+
+# produce a master bias
+bias.list  :
+	ls source/flat_bias*/*$(CHIP_NAME)* > bias.list
+
+masterbias.fits : bias.list
+	stack_biases.py $(FILE_HANDLER) $$(cat bias.list) > stack_biases.log 2>&1
+
+tuple_bias.npy : bias.list masterbias.fits
+	# need masterbias, because by default, it gets subtracted.
+	# forls the pairs list file (2 files per line)
+	awk '{printf("%s ",$$0);  if ((FNR%2) == 0) print '\n'}' bias.list > bias_pairs.list
+	# run the standard code, without a distance cut
+	corr.py $(FILE_HANDLER) bias_pairs.list -t $@  > corr_biases.log 2>&1
+
+# produce a list of flat pairs. Easy: members of the pairs are taken in a row.
+pairs.list :
+	ls source/flat_ND*/*$(CHIP_NAME)* $(NO_BAD_FILES) | awk '{printf("%s ",$$0);  if ((FNR%2) == 0) print '\n'}' > $@
+
+# collect data for linearity study
+tuple_lin.npy : pairs.list masterbias.fits
+	time corr.py $(FILE_HANDLER) pairs.list -m 3 -t $@  > corr0.log 2>&1
+
+fit_be.pkl : tuple_begin.npy tuple_end.npy
+	../plot_be.py tuple_begin.npy tuple_end.npy $@
+# compute covariances for a subpart of the segment
+tuple_end.npy : pairs.list masterbias.fits
+	cp $$BFPARAMS end.yaml; echo margin_left : 350 >> end.yaml ; export BFPARAMS=end.yaml; \
+	corr.py $(FILE_HANDLER) pairs.list -m 3 -t $@  > corr_end.log 2>&1	
+
+tuple_begin.npy : pairs.list masterbias.fits
+	cp $$BFPARAMS begin.yaml; echo margin_right : 350 >> begin.yaml ; export BFPARAMS=begin.yaml; \
+	corr.py $(FILE_HANDLER) pairs.list -m 3 -t $@  > corr_begin.log 2>&1	
+
+# produce the nonlinearity correction
+# $< : name of the first prerequisite
+nonlin.pkl : tuple_lin.npy
+	# ipython because it crashes with MPLBACKEND = Agg and plain python (!?)
+	../model_nonlin.py $< $@ > nonlin.log 2>&1
+
+flats_for_mask.list : tuple_lin.npy pairs.list
+	../make_flat_for_mask_list.py pairs.list tuple_lin.npy flats_for_mask.list	
+
+dead.fits : flats_for_mask.list
+	time make_mask.py $(FILE_HANDLER) $$(cat flats_for_mask.list) > make_mask.log 2>&1
+
+# produce a tuple that contains overscan values for CTI
+over.npy : pairs.list
+	time over.py $(FILE_HANDLER) pairs.list -t $@ > over.log 2>&1
+
+# Produce the CTI curves
+cte.pkl : over.npy 
+	../model_cte.py $< $@ > cte.log 2>&1
+
+# Measure variances and covariances, all corrections applied
+tuple.npy : nonlin.pkl cte.pkl masterbias.fits dead.fits
+	time corr.py pairs.list $(FILE_HANDLER) -m 40 -d -n -t $@ > corr1.log 2>&1
+
+#if placed at the end of the Makefile, all intermediate products are kept 
+.SECONDARY :
+
+
+allfits.pkl : tuple.npy
+	../fitptc.py tuple.npy $@ > fitptc.log 2>&1
+
+
+#mkdir flats
+#cd flats
+#ln -s $(ls ../source/flat_ND*/*R22_S00* | grep -v 434626.0)  .
+#cd ..
+#mkdir bias
+#cd bias
+#ln -s ../source/flat_bias*/*R22_S00* .
+#cd ..
+#ls flats/*.fits | awk '{printf("%s ",$0);  if ((FNR%2) == 0) print '\n'}' > paires.list 
+#stack_biases.py -f S bias/*
+

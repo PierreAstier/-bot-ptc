@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#rafts="  R00  R01  R02  R04  R10  R11  R12  R20  R21  R22  R30  R40  R44"
+rafts=" R01 R10 R11 R12 R20 R02 R21 R22 R30"
+chips=$(echo S{0,1,2}{0,1,2})
+if [ "x"$1 != "x" ] ; then
+  target="/"$1
+fi
+maxjob=25
+for raft in $rafts ; do
+    for chip in $chips; do
+    while test $(jobs | wc -l) -gt $maxjob ; do
+       sleep 10
+    done 
+    make ${raft}_${chip}${target} &
+    sleep 1
+    done
+done    
+
