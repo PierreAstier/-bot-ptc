@@ -1,0 +1,6 @@
+nonlin_corr_file : nonlin.pkl
+deferred_charge_corr_file : cte.pkl
+subtract_bias : true
+overscan_skip : 8
+params.subtract_sky_before_clipping : True
+use_dead : True
